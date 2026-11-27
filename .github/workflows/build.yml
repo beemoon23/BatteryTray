@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - feature/hid-ajazz-onikuma-detection
+      - feature/onikuma-all-hid-diagnostics
   pull_request:
     branches:
       - main
@@ -42,7 +43,7 @@ jobs:
           if-no-files-found: error
 
       - name: Package updater release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/hid-ajazz-onikuma-detection'
+        if: github.event_name == 'push' && contains(fromJSON('["refs/heads/feature/hid-ajazz-onikuma-detection","refs/heads/feature/onikuma-all-hid-diagnostics"]'), github.ref)
         shell: pwsh
         run: Compress-Archive -Path artifacts/* -DestinationPath artifacts/BatteryTray-win-x64.zip -Force
 
