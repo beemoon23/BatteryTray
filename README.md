@@ -30,3 +30,7 @@ dotnet publish src/BatteryTray/BatteryTray.csproj --configuration Release --runt
 ```
 
 O workflow do GitHub Actions está configurado para compilar e publicar o executável como artefato em pushes, pull requests e execução manual. 
+
+## Atualização automática
+
+O aplicativo verifica silenciosamente, ao iniciar, se há uma versão beta mais recente publicada pelo próprio repositório. Quando encontra uma atualização, apresenta uma confirmação antes de baixar e instalar. Também é possível usar **Verificar atualizações** no menu da bandeja. O instalador auxiliar aguarda o encerramento do BatteryTray, substitui os arquivos da instalação atual e reabre o aplicativo. A atualização é distribuída por releases HTTPS do GitHub; a versão estável não é alterada por esse canal beta.
