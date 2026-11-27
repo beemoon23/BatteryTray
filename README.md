@@ -17,7 +17,7 @@ Identificado no Windows como `VID_3554&PID_FA09` (`2.4G Wireless Receiver`). O B
 
 ### Onikuma B2
 
-Identificado como `VID_3634&PID_4155` e anunciado pelo Windows como `GAMING HEADSET B2` (JieLi). Uma base comunitária de compatibilidade também lista esse VID:PID entre os headsets sem consulta de bateria documentada: os canais proprietários do dongle pertencem ao chip de áudio/firmware e não devem receber comandos presumidos. O app mostra o headset como detectado, sem inventar percentual e sem enviar comandos HID não documentados. Se o B2 for pareado em modo Bluetooth e o próprio Windows receber o nível pelo perfil de bateria, poderemos estudar a leitura desse caminho também.
+Identificado como `VID_3634&PID_4155` e anunciado pelo Windows como `GAMING HEADSET B2` (JieLi). Não há consulta de bateria documentada; os canais proprietários pertencem ao chip de áudio/firmware e não devem receber comandos presumidos. O menu da bandeja oferece **Diagnóstico passivo do Onikuma (15 s)**: abre somente a coleção HID `FF02:0002`, registra os relatórios de entrada espontâneos durante 15 segundos e salva um arquivo de texto na Área de Trabalho. Nenhum relatório Output ou Feature é enviado. Durante a captura, use o headset sem fio (fale no microfone, ajuste o volume ou reproduza áudio). Envie o arquivo `BatteryTray-Onikuma-*.txt` para análise. A captura é evidência para investigação; ela não transforma bytes desconhecidos em percentual e não garante que o firmware transmita a bateria espontaneamente.
 
 ## Compilação
 
@@ -29,4 +29,4 @@ dotnet build BatteryTray.sln --configuration Release
 dotnet publish src/BatteryTray/BatteryTray.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output artifacts
 ```
 
-O workflow do GitHub Actions está configurado para compilar e publicar o executável como artefato em pushes, pull requests e execução manual. Até o momento, ainda não há uma execução de CI confirmada para esta branch.
+O workflow do GitHub Actions está configurado para compilar e publicar o executável como artefato em pushes, pull requests e execução manual. 
