@@ -4,13 +4,12 @@ using Windows.Devices.Power;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
 using Windows.Storage.Streams;
-using System.Diagnostics;
 
 namespace BatteryTray;
 
 /// <summary>
-/// Reads Windows battery devices, standard BLE batteries, and the documented read-only
-/// battery protocol used by the 3554:FA09 2.4 GHz keyboard receiver.
+/// Reads Windows and standard BLE batteries, and identifies supported vendor HID devices without
+/// sending unverified vendor reports.
 /// </summary>
 public sealed class BatteryService
 {
