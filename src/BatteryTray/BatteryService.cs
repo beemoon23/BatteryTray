@@ -27,8 +27,9 @@ public sealed class BatteryService
     }
 
     /// <summary>
-    /// Passively records input reports from the Onikuma B2 vendor HID collection.
-    /// This method never writes output or feature reports to the device.
+    /// Passively records input reports from every HID interface exposed by the Onikuma B2 dongle.
+    /// No Output or Feature reports are sent. All interfaces are observed concurrently so the
+    /// requested duration is a single shared capture window.
     /// </summary>
     public Task<string> CaptureOnikumaReportsAsync(TimeSpan duration, CancellationToken cancellationToken = default)
     {
@@ -39,61 +40,33 @@ public sealed class BatteryService
     {
         var log = new System.Text.StringBuilder();
         var devices = DeviceList.Local.GetHidDevices(0x3634, 0x4155)
-            .Where(HasOnikumaVendorCollection)
+            .GroupBy(device => device.DevicePath, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
             .ToList();
 
-        log.AppendLine("BatteryTray — diagnóstico passivo Onikuma B2");
-        log.AppendLine($"VID:PID 3634:4155 | Duração solicitada: {duration.TotalSeconds:0} s");
+        log.AppendLine("BatteryTray — diagnóstico passivo Onikuma B2 (todas as interfaces HID)");
+        log.AppendLine($"VID:PID 3634:4155 | Janela de captura: {duration.TotalSeconds:0} s por interface, em paralelo");
         log.AppendLine("Modo somente leitura: nenhum relatório Output/Feature foi enviado.");
         log.AppendLine($"Início: {DateTimeOffset.Now:O}");
+        log.AppendLine($"Interfaces HID encontradas: {devices.Count}");
         log.AppendLine();
 
         if (devices.Count == 0)
         {
-            log.AppendLine("Interface HID proprietária FF02:0002 não encontrada ou descritor indisponível.");
+            log.AppendLine("Nenhuma interface HID com VID:PID 3634:4155 foi enumerada pelo Windows.");
+            log.AppendLine($"Fim: {DateTimeOffset.Now:O}");
             return log.ToString();
         }
 
-        foreach (var device in devices)
+        // Read every HID collection at the same time. A silent interface must not prevent
+        // another collection from being observed during the same 15-second window.
+        var captures = devices.Select((device, index) =>
+            Task.Run(() => CaptureOnikumaInterface(device, index + 1, duration, ct), ct)).ToArray();
+        Task.WaitAll(captures, ct);
+
+        foreach (var capture in captures)
         {
-            ct.ThrowIfCancellationRequested();
-            log.AppendLine($"Interface: {device.DevicePath}");
-            log.AppendLine($"Relatório de entrada máximo: {device.GetMaxInputReportLength()} bytes");
-
-            try
-            {
-                using var stream = device.Open();
-                stream.ReadTimeout = 250;
-                var buffer = new byte[Math.Max(1, device.GetMaxInputReportLength())];
-                var timer = Stopwatch.StartNew();
-                var reportCount = 0;
-                var uniqueReports = new HashSet<string>(StringComparer.Ordinal);
-                var outputLimit = 500;
-
-                while (timer.Elapsed < duration && reportCount < 2000)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    try
-                    {
-                        var count = stream.Read(buffer, 0, buffer.Length);
-                        if (count <= 0) continue;
-                        reportCount++;
-                        var hex = Convert.ToHexString(buffer.AsSpan(0, count));
-                        uniqueReports.Add(hex);
-                        if (reportCount <= outputLimit)
-                            log.AppendLine($"{timer.Elapsed.TotalMilliseconds,8:0} ms | {count,2} bytes | {hex}");
-                    }
-                    catch (TimeoutException) { }
-                }
-
-                log.AppendLine($"Resumo: {reportCount} relatório(s), {uniqueReports.Count} padrão(ões) distinto(s).");
-                if (reportCount > outputLimit)
-                    log.AppendLine($"Saída limitada aos primeiros {outputLimit} relatórios.");
-            }
-            catch (Exception ex)
-            {
-                log.AppendLine($"Falha ao abrir/ler em modo passivo: {ex.GetType().Name}: {ex.Message}");
-            }
+            log.Append(capture.Result);
             log.AppendLine();
         }
 
@@ -101,19 +74,76 @@ public sealed class BatteryService
         return log.ToString();
     }
 
-    private static bool HasOnikumaVendorCollection(HidDevice device)
+    private static string CaptureOnikumaInterface(HidDevice device, int index, TimeSpan duration, CancellationToken ct)
     {
+        var log = new System.Text.StringBuilder();
+        log.AppendLine($"=== Interface {index} ===");
+        log.AppendLine($"Caminho: {device.DevicePath}");
+
         try
         {
-            var descriptor = device.GetReportDescriptor();
-            return descriptor.DeviceItems.Any(item =>
-                item.Usages.GetAllValues().Any(value => value == 0xFF020002))
-                && device.GetMaxInputReportLength() > 0;
+            var inputLength = device.GetMaxInputReportLength();
+            log.AppendLine($"Relatório de entrada máximo: {inputLength} bytes");
+            log.AppendLine($"Relatório de saída máximo: {device.GetMaxOutputReportLength()} bytes (não utilizado)");
+            log.AppendLine($"Relatório Feature máximo: {device.GetMaxFeatureReportLength()} bytes (não utilizado)");
+
+            try
+            {
+                var descriptor = device.GetReportDescriptor();
+                var usageItems = descriptor.DeviceItems
+                    .SelectMany(item => item.Usages.GetAllValues())
+                    .Distinct()
+                    .Select(value => $"{value >> 16:X4}:{value & 0xFFFF:X4}")
+                    .ToArray();
+                log.AppendLine($"Usages HID: {(usageItems.Length == 0 ? "não informados" : string.Join(", ", usageItems))}");
+                log.AppendLine($"Report IDs de entrada: {string.Join(", ", descriptor.InputReports.Select(report => $"0x{report.ReportID:X2} ({report.Length} bytes)"))}");
+            }
+            catch (Exception ex)
+            {
+                log.AppendLine($"Descritor HID indisponível: {ex.GetType().Name}: {ex.Message}");
+            }
+
+            if (inputLength <= 0)
+            {
+                log.AppendLine("Resumo: interface sem relatório de entrada.");
+                return log.ToString();
+            }
+
+            using var stream = device.Open();
+            stream.ReadTimeout = 250;
+            var buffer = new byte[inputLength];
+            var timer = Stopwatch.StartNew();
+            var reportCount = 0;
+            var uniqueReports = new HashSet<string>(StringComparer.Ordinal);
+            const int outputLimit = 300;
+
+            while (timer.Elapsed < duration && reportCount < 2000)
+            {
+                ct.ThrowIfCancellationRequested();
+                try
+                {
+                    var count = stream.Read(buffer, 0, buffer.Length);
+                    if (count <= 0) continue;
+                    reportCount++;
+                    var hex = Convert.ToHexString(buffer.AsSpan(0, count));
+                    uniqueReports.Add(hex);
+                    if (reportCount <= outputLimit)
+                        log.AppendLine($"{timer.Elapsed.TotalMilliseconds,8:0} ms | {count,2} bytes | {hex}");
+                }
+                catch (TimeoutException) { }
+            }
+
+            log.AppendLine($"Resumo: {reportCount} relatório(s), {uniqueReports.Count} padrão(ões) distinto(s).");
+            if (reportCount > outputLimit)
+                log.AppendLine($"Saída limitada aos primeiros {outputLimit} relatórios.");
         }
-        catch
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
         {
-            return false;
+            log.AppendLine($"Falha ao abrir/ler em modo passivo: {ex.GetType().Name}: {ex.Message}");
         }
+
+        return log.ToString();
     }
 
     private static async Task ReadWindowsBatteryDevices(Dictionary<string, DeviceBattery> results, CancellationToken ct)
