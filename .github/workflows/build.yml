@@ -1,0 +1,39 @@
+name: Windows build
+
+on:
+  push:
+    branches:
+      - main
+      - feature/hid-ajazz-onikuma-detection
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore BatteryTray.sln
+
+      - name: Build
+        run: dotnet build BatteryTray.sln --configuration Release --no-restore
+
+      - name: Publish self-contained x64
+        run: dotnet publish src/BatteryTray/BatteryTray.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output artifacts
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: BatteryTray-win-x64
+          path: artifacts/
+          if-no-files-found: error
