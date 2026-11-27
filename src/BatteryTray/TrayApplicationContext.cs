@@ -11,6 +11,7 @@ public sealed class TrayApplicationContext : ApplicationContext
     private readonly BatteryService _service = new();
     private readonly ToolStripMenuItem _summary;
     private readonly ToolStripMenuItem _refresh;
+    private readonly ToolStripMenuItem _diagnose;
     private readonly ToolStripMenuItem _startup;
     private readonly ToolStripMenuItem _open;
     private readonly ToolStripMenuItem _exit;
@@ -25,9 +26,10 @@ public sealed class TrayApplicationContext : ApplicationContext
         _summary = new ToolStripMenuItem("Procurando dispositivos...") { Enabled = false };
         _open = new ToolStripMenuItem("Abrir BatteryTray", null, (_, _) => ShowPanel());
         _refresh = new ToolStripMenuItem("Atualizar agora", null, async (_, _) => await RefreshAsync());
+        _diagnose = new ToolStripMenuItem("Diagnóstico passivo do Onikuma (15 s)", null, async (_, _) => await CaptureOnikumaAsync());
         _startup = new ToolStripMenuItem("Iniciar com o Windows", null, (_, _) => ToggleStartup()) { CheckOnClick = true, Checked = IsStartupEnabled() };
         _exit = new ToolStripMenuItem("Sair", null, (_, _) => ExitThread());
-        _menu.Items.AddRange([_summary, new ToolStripSeparator(), _open, _refresh, _startup, new ToolStripSeparator(), _exit]);
+        _menu.Items.AddRange([_summary, new ToolStripSeparator(), _open, _refresh, _diagnose, _startup, new ToolStripSeparator(), _exit]);
         _tray = new NotifyIcon { Visible = true, Text = "BatteryTray — monitor de bateria", Icon = CreateBatteryIcon(null), ContextMenuStrip = _menu };
         _tray.DoubleClick += (_, _) => ShowPanel();
         _timer = new System.Windows.Forms.Timer { Interval = 60_000 };
@@ -68,6 +70,33 @@ public sealed class TrayApplicationContext : ApplicationContext
             System.Diagnostics.Debug.WriteLine(ex);
         }
         finally { _refresh.Enabled = true; _scanning = false; }
+    }
+
+    private async Task CaptureOnikumaAsync()
+    {
+        if (_disposed || _diagnose.Enabled == false) return;
+        _diagnose.Enabled = false;
+        _tray.ShowBalloonTip(4000, "BatteryTray — diagnóstico Onikuma",
+            "Capturando somente os relatórios enviados pelo dongle. Use o headset sem fio durante 15 segundos.",
+            ToolTipIcon.Info);
+        try
+        {
+            var report = await _service.CaptureOnikumaReportsAsync(TimeSpan.FromSeconds(15));
+            var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            var file = Path.Combine(desktop, $"BatteryTray-Onikuma-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+            await File.WriteAllTextAsync(file, report, System.Text.Encoding.UTF8);
+            _tray.ShowBalloonTip(6000, "Diagnóstico concluído",
+                $"Arquivo salvo na Área de Trabalho: {Path.GetFileName(file)}. Envie-o aqui para analisarmos.",
+                ToolTipIcon.Info);
+        }
+        catch (Exception ex)
+        {
+            _tray.ShowBalloonTip(6000, "Falha no diagnóstico Onikuma", ex.Message, ToolTipIcon.Error);
+        }
+        finally
+        {
+            if (!_disposed) _diagnose.Enabled = true;
+        }
     }
 
     private void CheckLowBattery(int percent)
