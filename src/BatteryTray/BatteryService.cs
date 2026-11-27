@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using HidSharp;
 using Windows.Devices.Enumeration;
 using Windows.Devices.Power;
