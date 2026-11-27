@@ -27,7 +27,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         _summary = new ToolStripMenuItem("Procurando dispositivos...") { Enabled = false };
         _open = new ToolStripMenuItem("Abrir BatteryTray", null, (_, _) => ShowPanel());
         _refresh = new ToolStripMenuItem("Atualizar agora", null, async (_, _) => await RefreshAsync());
-        _diagnose = new ToolStripMenuItem("Diagnóstico passivo do Onikuma (15 s)", null, async (_, _) => await CaptureOnikumaAsync());
+        _diagnose = new ToolStripMenuItem("Diagnóstico passivo de todas as interfaces Onikuma (15 s)", null, async (_, _) => await CaptureOnikumaAsync());
         _updates = new ToolStripMenuItem("Verificar atualizações", null, async (_, _) => await CheckForUpdatesAsync(false));
         _startup = new ToolStripMenuItem("Iniciar com o Windows", null, (_, _) => ToggleStartup()) { CheckOnClick = true, Checked = IsStartupEnabled() };
         _exit = new ToolStripMenuItem("Sair", null, (_, _) => ExitThread());
