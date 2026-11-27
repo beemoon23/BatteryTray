@@ -6,17 +6,14 @@ Aplicativo de bandeja para Windows 11 que monitora níveis de bateria de disposi
 
 - Windows Battery API.
 - Bluetooth LE Battery Service padrão (UUID 0x180F / 0x2A19).
-- Leitura HID experimental e somente de consulta para receptores 2.4 GHz `3554:FA09`, usando o relatório documentado `0x13 / 0x4A`.
-- Identificação do Onikuma B2 (`3634:4155`) sem exibir percentual até existir um protocolo confiável.
+- Identificação de receptores HID específicos sem enviar comandos proprietários não validados.
 - Não inventa níveis quando o dispositivo não fornece uma leitura válida.
 
-## Compatibilidade investigada
+## Dispositivos investigados
 
 ### Ajazz F75 — receptor 2.4 GHz
 
-O receptor foi identificado no Windows como `VID_3554&PID_FA09`, com coleção HID de uso `FF02:0002`. O BatteryTray envia uma consulta HID de leitura de bateria e só aceita respostas com ID de relatório, comando e checksum válidos.
-
-Limitações conhecidas: alguns dispositivos que usam esse receptor não respondem à consulta. Quando conectado por cabo, o protocolo pode reportar 100% fixo; nesse caso o app deliberadamente não mostra percentual.
+Identificado no Windows como `VID_3554&PID_FA09` (`2.4G Wireless Receiver`). O BatteryTray já consegue identificar o receptor por HID, mas ainda não consulta a bateria. Existe um protocolo comunitário associado a esse identificador; antes de ativá-lo, precisamos validar a coleção HID e o descritor da interface no Windows para garantir que o relatório seja enviado à interface correta.
 
 ### Onikuma B2
 
@@ -24,6 +21,12 @@ Identificado como `VID_3634&PID_4155`. O Windows expõe interfaces de áudio e H
 
 ## Compilação
 
-No Windows com .NET 8 SDK instalado, execute `build.bat`.
+No Windows com .NET 8 SDK instalado:
 
-A dependência HidSharp é restaurada automaticamente pelo NuGet.
+```powershell
+dotnet restore BatteryTray.sln
+dotnet build BatteryTray.sln --configuration Release
+dotnet publish src/BatteryTray/BatteryTray.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output artifacts
+```
+
+O workflow do GitHub Actions executa a compilação e publica o executável como artefato quando acionado por push ou pull request.
