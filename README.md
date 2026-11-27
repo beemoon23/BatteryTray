@@ -1,15 +1,29 @@
 # BatteryTray
 
-Aplicativo de bandeja para Windows 11 que monitora níveis de bateria expostos por dispositivos compatíveis.
+Aplicativo de bandeja para Windows 11 que monitora níveis de bateria de dispositivos compatíveis.
 
-## Código-fonte inicial
+## Recursos atuais
 
-O arquivo `archive/BatteryTray-source-fixed2.zip` contém a solução Visual Studio recuperada, incluindo o projeto .NET 8, código-fonte, manifesto e script `build.bat`.
+- Windows Battery API.
+- Bluetooth LE Battery Service padrão (UUID 0x180F / 0x2A19).
+- Leitura HID experimental e somente de consulta para receptores 2.4 GHz `3554:FA09`, usando o relatório documentado `0x13 / 0x4A`.
+- Identificação do Onikuma B2 (`3634:4155`) sem exibir percentual até existir um protocolo confiável.
+- Não inventa níveis quando o dispositivo não fornece uma leitura válida.
 
-## Limitações
+## Compatibilidade investigada
 
-Nem todo periférico USB, receptor 2.4 GHz ou Bluetooth expõe bateria por uma API padrão. O aplicativo não deve inventar percentuais. Integrações específicas para AULA F75 e ONIKUMA B2 ainda precisam ser investigadas e testadas.
+### Ajazz F75 — receptor 2.4 GHz
+
+O receptor foi identificado no Windows como `VID_3554&PID_FA09`, com coleção HID de uso `FF02:0002`. O BatteryTray envia uma consulta HID de leitura de bateria e só aceita respostas com ID de relatório, comando e checksum válidos.
+
+Limitações conhecidas: alguns dispositivos que usam esse receptor não respondem à consulta. Quando conectado por cabo, o protocolo pode reportar 100% fixo; nesse caso o app deliberadamente não mostra percentual.
+
+### Onikuma B2
+
+Identificado como `VID_3634&PID_4155`. O Windows expõe interfaces de áudio e HID, mas ainda não há protocolo de bateria validado para este modelo. O app mostra o dispositivo como detectado, sem inventar percentual e sem enviar comandos HID não documentados.
 
 ## Compilação
 
-Extraia o ZIP e execute `build.bat` em um Windows com .NET 8 SDK instalado.
+No Windows com .NET 8 SDK instalado, execute `build.bat`.
+
+A dependência HidSharp é restaurada automaticamente pelo NuGet.
