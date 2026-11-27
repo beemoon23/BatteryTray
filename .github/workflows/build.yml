@@ -1,5 +1,8 @@
 name: Windows build
 
+permissions:
+  contents: write
+
 on:
   push:
     branches:
@@ -29,7 +32,7 @@ jobs:
         run: dotnet build BatteryTray.sln --configuration Release --no-restore
 
       - name: Publish self-contained x64
-        run: dotnet publish src/BatteryTray/BatteryTray.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output artifacts
+        run: dotnet publish src/BatteryTray/BatteryTray.csproj --configuration Release --runtime win-x64 --self-contained true -p:Version=0.2.${{ github.run_number }} -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output artifacts
 
       - name: Upload executable
         uses: actions/upload-artifact@v4
@@ -37,3 +40,20 @@ jobs:
           name: BatteryTray-win-x64
           path: artifacts/
           if-no-files-found: error
+
+      - name: Package updater release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/hid-ajazz-onikuma-detection'
+        shell: pwsh
+        run: Compress-Archive -Path artifacts/* -DestinationPath artifacts/BatteryTray-win-x64.zip -Force
+
+      - name: Publish beta release for in-app updater
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/hid-ajazz-onikuma-detection'
+        uses: ncipollo/release-action@v1
+        with:
+          tag: v0.2.${{ github.run_number }}
+          name: BatteryTray v0.2.${{ github.run_number }}
+          prerelease: true
+          allowUpdates: false
+          artifacts: artifacts/BatteryTray-win-x64.zip
+          artifactErrorsFailBuild: true
+          generateReleaseNotes: true
