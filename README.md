@@ -17,7 +17,7 @@ Identificado no Windows como `VID_3554&PID_FA09` (`2.4G Wireless Receiver`). O B
 
 ### Onikuma B2
 
-Identificado como `VID_3634&PID_4155`. O Windows expõe interfaces de áudio e HID, mas ainda não há protocolo de bateria validado para este modelo. O app mostra o dispositivo como detectado, sem inventar percentual e sem enviar comandos HID não documentados.
+Identificado como `VID_3634&PID_4155` e anunciado pelo Windows como `GAMING HEADSET B2` (JieLi). Uma base comunitária de compatibilidade também lista esse VID:PID entre os headsets sem consulta de bateria documentada: os canais proprietários do dongle pertencem ao chip de áudio/firmware e não devem receber comandos presumidos. O app mostra o headset como detectado, sem inventar percentual e sem enviar comandos HID não documentados. Se o B2 for pareado em modo Bluetooth e o próprio Windows receber o nível pelo perfil de bateria, poderemos estudar a leitura desse caminho também.
 
 ## Compilação
 
