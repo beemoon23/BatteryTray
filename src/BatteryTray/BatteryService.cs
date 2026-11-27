@@ -113,7 +113,7 @@ public sealed class BatteryService
             ct.ThrowIfCancellationRequested();
             try
             {
-                if (device.GetUsagePage() != 0xFF02 || device.GetUsage() != 0x0002)
+                if (!HasAulaBatteryCollection(device))
                     continue;
                 if (device.GetMaxOutputReportLength() < 20 || device.GetMaxInputReportLength() < 20)
                     continue;
@@ -179,6 +179,26 @@ public sealed class BatteryService
         }
 
         return results;
+    }
+
+    private static bool HasAulaBatteryCollection(HidDevice device)
+    {
+        try
+        {
+            // HidSharp encodes a Usage as (usage page << 16) | usage.
+            // Restrict writes to the documented vendor collection FF02:0002 and report 0x13.
+            var descriptor = device.GetReportDescriptor();
+            var hasUsage = descriptor.DeviceItems.Any(item =>
+                item.Usages.GetAllValues().Any(value => value == 0xFF020002));
+            var hasBatteryOutput = descriptor.OutputReports.Any(report =>
+                report.ReportID == 0x13 && report.Length == 20);
+            return hasUsage && hasBatteryOutput;
+        }
+        catch
+        {
+            // If the collection cannot be verified, do not send anything to the receiver.
+            return false;
+        }
     }
 
     private static byte[] BuildAulaBatteryRequest()
