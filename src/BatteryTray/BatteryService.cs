@@ -26,6 +26,96 @@ public sealed class BatteryService
         return results.Values.OrderBy(x => x.Name).ToList();
     }
 
+    /// <summary>
+    /// Passively records input reports from the Onikuma B2 vendor HID collection.
+    /// This method never writes output or feature reports to the device.
+    /// </summary>
+    public Task<string> CaptureOnikumaReportsAsync(TimeSpan duration, CancellationToken cancellationToken = default)
+    {
+        return Task.Run(() => CaptureOnikumaReportsSync(duration, cancellationToken), cancellationToken);
+    }
+
+    private static string CaptureOnikumaReportsSync(TimeSpan duration, CancellationToken ct)
+    {
+        var log = new System.Text.StringBuilder();
+        var devices = DeviceList.Local.GetHidDevices(0x3634, 0x4155)
+            .Where(HasOnikumaVendorCollection)
+            .ToList();
+
+        log.AppendLine("BatteryTray — diagnóstico passivo Onikuma B2");
+        log.AppendLine($"VID:PID 3634:4155 | Duração solicitada: {duration.TotalSeconds:0} s");
+        log.AppendLine("Modo somente leitura: nenhum relatório Output/Feature foi enviado.");
+        log.AppendLine($"Início: {DateTimeOffset.Now:O}");
+        log.AppendLine();
+
+        if (devices.Count == 0)
+        {
+            log.AppendLine("Interface HID proprietária FF02:0002 não encontrada ou descritor indisponível.");
+            return log.ToString();
+        }
+
+        foreach (var device in devices)
+        {
+            ct.ThrowIfCancellationRequested();
+            log.AppendLine($"Interface: {device.DevicePath}");
+            log.AppendLine($"Relatório de entrada máximo: {device.GetMaxInputReportLength()} bytes");
+
+            try
+            {
+                using var stream = device.Open();
+                stream.ReadTimeout = 250;
+                var buffer = new byte[Math.Max(1, device.GetMaxInputReportLength())];
+                var timer = Stopwatch.StartNew();
+                var reportCount = 0;
+                var uniqueReports = new HashSet<string>(StringComparer.Ordinal);
+                var outputLimit = 500;
+
+                while (timer.Elapsed < duration && reportCount < 2000)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    try
+                    {
+                        var count = stream.Read(buffer, 0, buffer.Length);
+                        if (count <= 0) continue;
+                        reportCount++;
+                        var hex = Convert.ToHexString(buffer.AsSpan(0, count));
+                        uniqueReports.Add(hex);
+                        if (reportCount <= outputLimit)
+                            log.AppendLine($"{timer.Elapsed.TotalMilliseconds,8:0} ms | {count,2} bytes | {hex}");
+                    }
+                    catch (TimeoutException) { }
+                }
+
+                log.AppendLine($"Resumo: {reportCount} relatório(s), {uniqueReports.Count} padrão(ões) distinto(s).");
+                if (reportCount > outputLimit)
+                    log.AppendLine($"Saída limitada aos primeiros {outputLimit} relatórios.");
+            }
+            catch (Exception ex)
+            {
+                log.AppendLine($"Falha ao abrir/ler em modo passivo: {ex.GetType().Name}: {ex.Message}");
+            }
+            log.AppendLine();
+        }
+
+        log.AppendLine($"Fim: {DateTimeOffset.Now:O}");
+        return log.ToString();
+    }
+
+    private static bool HasOnikumaVendorCollection(HidDevice device)
+    {
+        try
+        {
+            var descriptor = device.GetReportDescriptor();
+            return descriptor.DeviceItems.Any(item =>
+                item.Usages.GetAllValues().Any(value => value == 0xFF020002))
+                && device.GetMaxInputReportLength() > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static async Task ReadWindowsBatteryDevices(Dictionary<string, DeviceBattery> results, CancellationToken ct)
     {
         try
