@@ -102,7 +102,7 @@ try {{
 }}";
             await File.WriteAllTextAsync(scriptPath, script, cancellationToken);
 
-            Process.Start(new ProcessStartInfo
+            _ = Process.Start(new ProcessStartInfo
             {
                 FileName = "powershell.exe",
                 Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{scriptPath}\"",
