@@ -175,7 +175,7 @@ public sealed class BatteryService
             if (results.Any(x => x.Id.StartsWith("HID:3634:4155:", StringComparison.OrdinalIgnoreCase)))
                 break;
             results.Add(new DeviceBattery(id, "Onikuma B2", null,
-                "USB HID (3634:4155)", "Detectado — protocolo de bateria ainda não identificado", DateTimeOffset.Now));
+                "USB HID/JieLi (3634:4155)", "Dongle detectado — não há consulta de bateria documentada; nenhum comando foi enviado", DateTimeOffset.Now));
         }
 
         return results;
