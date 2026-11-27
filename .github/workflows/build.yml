@@ -48,7 +48,7 @@ jobs:
         run: Compress-Archive -Path artifacts/* -DestinationPath artifacts/BatteryTray-win-x64.zip -Force
 
       - name: Publish beta release for in-app updater
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/hid-ajazz-onikuma-detection'
+        if: github.event_name == 'push' && contains(fromJSON('["refs/heads/feature/hid-ajazz-onikuma-detection","refs/heads/feature/onikuma-all-hid-diagnostics"]'), github.ref)
         uses: ncipollo/release-action@v1
         with:
           tag: v1.1.${{ github.run_number }}
